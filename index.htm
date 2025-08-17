@@ -28,7 +28,7 @@
 	cursor: pointer;
 }
 .dart-button:hover {
-  background-color: #f99;
+  background-color: #f33;
 }
 .dart-button:active{
   background-color: #c33;
@@ -47,7 +47,7 @@ body{
 	font-weight: bold;
 }
 #map {
-  height:80vh;
+  height:80svh;
 }
 #console {
   margin-bottom:20px;
@@ -157,7 +157,7 @@ body{
         <!--<span x-text="prefecture"></span>-->
       </div>
       <div class="option-area" x-show="mode=='area'" x-init="dart.area.setRadius(area_radius)">
-        <input type="range" min="1" max="350" id="area_radius" x-model="area_radius" @input="dart.area.setRadius(area_radius)">
+        <input type="range" min="1" max="200" id="area_radius" x-model="area_radius" @input="dart.area.setRadius(area_radius)">
         <!--<span x-text="(area_radius+'').padStart(3,'0')"></span>-->
         <input type="number" x-model="area_radius" size="3" style="width:3em" @input="dart.area.setRadius(area_radius)">km
         <button @click="dart.area.reopen()">再配置</button>
