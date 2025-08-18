@@ -154,11 +154,9 @@ body{
             <option x-text="pref.name"></option>
           </template>
         </select>
-        <!--<span x-text="prefecture"></span>-->
       </div>
       <div class="option-area" x-show="mode=='area'" x-init="dart.area.setRadius(area_radius)">
         <input type="range" min="1" max="200" id="area_radius" x-model="area_radius" @input="dart.area.setRadius(area_radius)">
-        <!--<span x-text="(area_radius+'').padStart(3,'0')"></span>-->
         <input type="number" x-model="area_radius" size="3" style="width:3em" @input="dart.area.setRadius(area_radius)">km
         <button @click="dart.area.reopen()">再配置</button>
       </div>
@@ -239,8 +237,6 @@ const dart = (()=>{
   }
   function is_mobile(){
     const mql = window.matchMedia("(max-width: 480px) and (orientation: portrait), (max-height: 480px) and (orientation: landscape)");
-    //console.log("mql",mql.matches);
-    //mql.addEventListener("change", m=>{console.log("mql", m.matches)});
     return mql.matches;
   }
 
@@ -455,9 +451,7 @@ const dart = (()=>{
     return {
       async init(){
         const j = await region.load();
-        //console.log("japan loaded", j);
         return j;
-        
       },
       async random(){
         return await region.random();
@@ -488,11 +482,9 @@ const dart = (()=>{
       },
       async load(pref){
         const p = await list[pref].load();
-        //console.log(pref, "loaded", p);
         return p;
       },
       async random(pref){
-        //console.log(pref, list[pref]);
         return await list[pref].random();
       }
     }
