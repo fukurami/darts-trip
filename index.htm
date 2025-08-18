@@ -258,7 +258,16 @@ const dart = (()=>{
     show: true,
     position: "topleft"
   }));
-  const marker = L.marker(def_center);
+  const dart_icon = L.icon({
+    iconUrl: "./dart56a.png",
+    iconSize: [53,56],
+    iconAnchor: [0,55],
+    shadowUrl:"./dart56a_shadow.png",
+    shadowSize:[56,28],
+    shadowAnchor:[0,21]
+  })
+
+  const marker = L.marker(def_center, {icon:dart_icon});
   let show_marker = false;
   let popup = null;
 
