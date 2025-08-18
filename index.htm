@@ -128,6 +128,35 @@ body{
 #history-list button:hover {
   color: #f33;
 }
+#history-export-dialog {
+  border:none;
+  border-radius:10px;
+  padding:10px;
+  text-align:center;
+  box-shadow: 0 0 3px #666;
+  min-width:240px;
+}
+ul.button-list {
+  list-style-type: none;
+  padding:5px;
+  margin:5px;
+}
+ul.button-list li{
+  margin:10px 0;
+}
+ul.button-list li button{ 
+	min-width: 100px;
+	line-height: 26px;
+	border-radius: 15px;
+	border-width: 1px;
+}
+.dialog-close-button {
+	border: none;
+	padding: 0 10px;
+	background: none;
+	color: blue;
+	text-decoration: underline;
+}
 
 </style>
 
@@ -172,7 +201,31 @@ body{
     <h3 id="history-title">履歴</h3>
     <div id="history-console" x-show="console_open">
       <button @click="clear_history">履歴をクリア</button>
+      <button @click="$refs.history_export_dialog.showModal()">エクスポート</button>
     </div>
+    <dialog id="history-export-dialog" x-ref="history_export_dialog">
+      <h4 style="font-size:1.2em;margin:0;font-weight:normal">エクスポート</h4>
+      <ul class="button-list">
+        <li>
+          <button @click="export_history('geoJSON')">GeoJSON</button><br>
+          <small>QGISなどGISソフト向けの形式です</small>
+        </li>
+        <li>
+          <button @click="export_history('CSV')">CSV(UTF-8)</button><br>
+          <small>汎用的なカンマ区切りテキストです。<br>文字コードの関係でExcelでは文字化けします。</small>
+      </li>
+        <li>
+          <button @click="export_history('list-txt')">txt</button><br>
+          <small>座標を列挙したテキストです</small>
+        </li>
+      </ul>
+      <form method="dialog" style="margin-bottom:10px;">
+        <button value="close" class="dialog-close-button">閉じる</button>
+      </form>
+      <div style="display:none">
+        <a x-ref="dl_link"></a>
+      </div>
+    </dialog>
     <table id="history-list">
       <tbody>
         <template x-for="(hist,i) in history">
@@ -286,7 +339,10 @@ const dart = (()=>{
           <a href="${create_gsimaps_url(latlng, zoom)}" target="_blank">地理院地図</a>` + (is_mobile()?`
           <br /><a href="${create_geouri(latlng, zoom)}" target="_blank">アプリを開く</a>
           `:"");
-        const shares = `<a href="${create_twitter_share(latlng, placeName)}" target="_blank">&#x1D54F;にポスト</a>`
+        const shares = `
+          <a href="${create_twitter_share(latlng, placeName)}" target="_blank">&#x1D54F;にポスト</a> | 
+          <a href="${create_share_url(latlng, placeName)}" target="_blank">共有リンク</a>
+          `
         setTimeout(()=>{
           popup = marker.bindPopup(`<strong>${placeName}</strong><br />に、行ってらっしゃい<br /><br />${urls}<br /><br />${shares}`).openPopup();
         },1000);
@@ -562,6 +618,65 @@ document.addEventListener("alpine:init", ()=>{
       if(confirm("履歴を全て削除しますか?")){
         this.history.length = 0;
       }      
+    },
+    create_history_CSV(){
+      const column_separator = ",";
+      const row_separator = "\r\n";
+      const header = ["no","mode","placeName","latitude","longtitude", "timestamp"];
+      const csv = [header.join(column_separator)];
+      this.history.forEach((hist,index)=>{
+        const row = [index, hist["mode"], hist["placeName"], hist["latlng"][0], hist["latlng"][1], hist["time"]].map(v=>{
+          if(v.toString().indexOf(column_separator)!=-1){
+            return `"${v.toString()}"`;
+          }
+          return v.toString();
+        });
+        csv.push(row.join(column_separator));
+      });
+      return csv.join(row_separator);
+    },
+    create_history_txt(){
+      return this.history.map(hist=>hist.latlng.join(",")).join("\r\n");
+    },
+    create_history_geoJSON(){
+      const root = {type:"FeatureCollection",features:[]};
+      this.history.forEach(hist=>{
+        root.features.push({
+          type:"Feature",
+          geometry:{
+            type:"Point",
+            coordinates:[hist.latlng[1],hist.latlng[0]]
+          },
+          properties:{
+            name:hist.placeName
+          }
+        });
+      })
+      return JSON.stringify(root);
+    },
+    export_history(mode){
+      let text = "{}", mime = "application/json", fileext = ".json";
+      if(mode=="CSV"){
+        text = this.create_history_CSV();
+        mime = "text/csv";
+        fileext = ".csv";
+      }
+      else if(mode=="list-txt"){
+        text = this.create_history_txt();
+        mime = "text/plain";
+        fileext = ".txt";
+      }
+      else if(mode=="geoJSON"){
+        text = this.create_history_geoJSON();
+        mime = "application/json";
+        fileext = ".geojson";
+      }
+      const blob = new Blob([text], {type:mime});
+      const objecturl = URL.createObjectURL(blob);
+      const link = this.$refs.dl_link;
+      link.href = objecturl;
+      link.download = `dart-${Date.now()}${fileext}`;
+      link.click();
     },
     async load_point(){
       if(location.search){
