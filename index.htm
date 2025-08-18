@@ -75,7 +75,7 @@ body{
 }
 #history-title {
   text-align:center;
-  background-color:#eef;
+  background-color:#ddf;
   margin-bottom:0;
 }
 #history-console-opener-container {
@@ -96,17 +96,24 @@ body{
 #history-console-opener>input[type=checkbox]{
   display:none;
 }
-#history-console-opener>input[type=checkbox]:not(:checked)+span{
+/*#history-console-opener>input[type=checkbox]:not(:checked)+span{
   transform:rotate(90deg);
 }
 #history-console-opener>input[type=checkbox]:checked+span{
   transform:rotate(-90deg);
+}*/
+#history-console-opener>input[type=checkbox]:not(:checked)+span::after{
+  content:"︙"
+}
+#history-console-opener>input[type=checkbox]:checked+span::after{
+  content:"×"
 }
 #history-console {
   background-color: #eee;
   border-radius:5px;
   margin:10px 0;
   padding:5px;
+  text-align: center;
 }
 
 #history-list {
@@ -194,7 +201,7 @@ ul.button-list li button{
     <div id="history-console-opener-container">
       <label id="history-console-opener">
         <input type="checkbox" x-model="console_open">
-        <span>&#x276F;</span>
+        <span></span>
       </label>
     </div>
     <h3 id="history-title">履歴</h3>
