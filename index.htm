@@ -275,6 +275,7 @@ const dart = (()=>{
     iconUrl: "./dart56a.png",
     iconSize: [53,56],
     iconAnchor: [0,55],
+    popupAnchor:[38,-38],
     shadowUrl:"./dart56a_shadow.png",
     shadowSize:[56,28],
     shadowAnchor:[0,21]
@@ -352,7 +353,7 @@ const dart = (()=>{
             const prefName = muni.prefName;
             const muniName = muni.muniName;
             const townName = json.results.lv01Nm;
-            placeName = `${prefName}${muniName}${townName=="-"?"":townName}`;
+            placeName = `${prefName}${muniName}${townName=="−"?"":townName}`; //ハイフンではなく全角マイナス（U+2212）
           }
         }
         placeName = placeName.replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/　/g,"");
