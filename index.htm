@@ -5,9 +5,10 @@
 <title>日本列島をダーツで旅するやつ</title>
 <meta property="og:title" content="日本列島をダーツで旅するやつ" />
 <meta property="og:type" content="website" />
-<meta property="og:url" content="https://fukurami.github.io/dart-trip/" />
+<meta property="og:url" content="https://fukurami.github.io/darts-trip/" />
+<meta property="og:image" content="https://fukurami.github.io/darts-trip/ogp.jpg" />
 <meta property="og:description" content="ダーツで日本全国のランダムな地点に旅しよう！都道府県やエリアの指定も可能！気まま旅のプラン作りや限界旅行のヒントに役立つツールサイト。" />
-<meta name="twitter:card" content="summary" />
+<meta name="twitter:card" content="summary_large_image" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
@@ -357,8 +358,8 @@ const dart = (()=>{
         placeName = placeName.replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/　/g,"");
         const urls = `
           <a href="${create_googlemaps_url(latlng, zoom)}" target="_blank">Googleマップ</a><br />
-          <a href="${create_gsimaps_url(latlng, zoom)}" target="_blank">地理院地図</a>` + (is_mobile()?`
-          <br /><a href="${create_geouri(latlng, zoom)}" target="_blank">アプリを開く</a>
+          <a href="${create_gsimaps_url(latlng, zoom)}" target="_blank">地理院地図</a>` + (is_mobile()?`<br />
+          <a href="${create_geouri(latlng, zoom)}" target="_blank">アプリを開く</a>
           `:"");
         const shares = `
           <a href="${create_twitter_share(latlng, placeName)}" target="_blank">&#x1D54F;にポスト</a> | 
