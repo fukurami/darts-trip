@@ -228,10 +228,13 @@ const dart = (()=>{
     zoom = Math.min(Math.max(parseInt(zoom),0),22)+"";
     return `geo:${lat},${lng}?q=${lat},${lng}&z=${zoom}`;
   }
-  function create_twitter_share(latlng, placeName="（不明な地点）"){
+  function create_share_url(latlng, placeName="（不明な地点）"){
     const lat = parseFloat(latlng[0]).toFixed(8);
     const lng = parseFloat(latlng[1]).toFixed(8);
-    const share_url = location.origin + location.pathname + `?ll=${lat},${lng}`;
+    return location.origin + location.pathname + `?ll=${lat},${lng}`;
+  }
+  function create_twitter_share(latlng, placeName="（不明な地点）"){
+    const share_url = create_share_url(latlng, placeName);
     const tweet_text = `【ダーツ旅】私は今から${placeName}に行ってきます！\n`;
     return `https://x.com/intent/tweet?text=${encodeURIComponent(tweet_text)}&url=${encodeURIComponent(share_url)}`;
   }
