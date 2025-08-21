@@ -164,6 +164,11 @@ ul.button-list li button{
 	border-radius: 15px;
 	border-width: 1px;
 }
+.dialog-title {
+  font-size:1.2em;
+  margin:0;
+  font-weight:normal
+}
 .dialog-close-button {
 	border: none;
 	padding: 0 10px;
@@ -216,11 +221,15 @@ ul.button-list li button{
       <button @click="$refs.history_export_dialog.showModal()">エクスポート</button>
     </div>
     <dialog id="history-export-dialog" x-ref="history_export_dialog">
-      <h4 style="font-size:1.2em;margin:0;font-weight:normal">エクスポート</h4>
+      <h4 class="dialog-title">履歴をエクスポート</h4>
       <ul class="button-list">
         <li>
           <button @click="export_history('geoJSON')">GeoJSON</button><br>
-          <small>QGISなどGISソフト向けの形式です</small>
+          <small>QGISなどのGISソフトや地理院地図向けの形式です。</small>
+        </li>
+        <li>
+          <button @click="export_history('KML')">KML</button><br>
+          <small>Googleマップ、Google Earth向けの形式です。</small>
         </li>
         <li>
           <button @click="export_history('CSV')">CSV(UTF-8)</button><br>
@@ -228,7 +237,7 @@ ul.button-list li button{
       </li>
         <li>
           <button @click="export_history('list-txt')">txt</button><br>
-          <small>座標を列挙したテキストです</small>
+          <small>座標を列挙したテキストです。</small>
         </li>
       </ul>
       <form method="dialog" style="margin-bottom:10px;">
@@ -256,7 +265,8 @@ ul.button-list li button{
   </div>
 </main>
 <footer id="footer" style="font-size: small; text-align: center; margin:20px;">
-  &copy; 2025 <a href="https://x.com/tfukumahi" target="_blank">@tfukumahi</a>
+  &copy; 2025 <a href="https://x.com/tfukumahi" target="_blank">@tfukumahi</a> <br>
+  一部に<a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2025.html" target="_blank">国土数値情報（行政区域データ）2025年（令和7年）版</a>を加工して利用
 </footer>
 
 <script>
@@ -635,6 +645,25 @@ document.addEventListener("alpine:init", ()=>{
       })
       return JSON.stringify(root);
     },
+    create_history_KML(){
+      const placemarks = this.history.map(hist=>{
+        return `
+<Placemark>
+  <name>${hist.placeName}</name>
+  <description>${hist.placeName}</description>
+  <Point>
+    <coordinates>${hist.latlng[1]},${hist.latlng[0]}</coordinates>
+  </Point>
+</Placemark>`;
+      });
+      return `
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+${placemarks.join("\r\n")}
+  </Document>
+</kml>`
+    },
     export_history(mode){
       let text = "{}", mime = "application/json", fileext = ".json";
       if(mode=="CSV"){
@@ -651,6 +680,11 @@ document.addEventListener("alpine:init", ()=>{
         text = this.create_history_geoJSON();
         mime = "application/json";
         fileext = ".geojson";
+      }
+      else if(mode=="KML"){
+        text = this.create_history_KML();
+        mime="application/vnd.google-earth.kml+xml";
+        fileext = ".kml";
       }
       const blob = new Blob([text], {type:mime});
       const objecturl = URL.createObjectURL(blob);
