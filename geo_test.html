@@ -1,0 +1,72 @@
+
+<!DOCTYPE html>
+<meta charset="utf8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+
+<div x-data="geo">
+  <div>
+    <button @click="start_watch">start watching</button>
+    <button @click="get_once">get location (once)</button>
+  </div>
+  <div x-text="enabled"></div>
+  <div x-text="watching"></div>
+  <div x-text="`(${lat}, ${lng})`"></div>
+  <ol>
+    <template x-for="hist in history">
+     <li x-text="`(${hist[0]},${hist[1]})`"></li> 
+    </template>
+  </ol>
+</div>
+
+<script>
+
+document.addEventListener("alpine:init", ()=>{
+  Alpine.data("geo", ()=>({
+    watching:false,
+    enabled:false,
+    lat:0,
+    lng:0,
+    id:null,
+    history:[],
+    start_watch(){
+      if(this.watching == false){
+        const id = navigator.geolocation.watchPosition(position=>{
+          this.watching = true;
+          this.enabled = true;
+          const c = position.coords;
+          if(this.lat != c.latitude || this.lng != c.longitude){
+            this.history.push([c.latitude,c.longitude]);
+          }
+          this.lat = c.latitude;
+          this.lng = c.longitude;
+          console.log("watch",this.lat,this.lng,c.accuracy);
+        }, err=>{
+          console.error(err);
+          this.enabled = false;
+        }, {enableHighAccuracy:true})
+        this.id = id;
+      }
+      else if(this.id){
+        navigator.geolocation.clearWatch(this.id);
+        this.watching = false;
+        this.id = null;
+      }
+    },
+    get_once(){
+      navigator.geolocation.getCurrentPosition(position=>{
+        const c = position.coords;
+        this.lat = c.latitude;
+        this.lng = c.longitude;
+        console.log("get",this.lat,this.lng,c.accuracy);
+      },err=>{
+        console.error(err);
+      })
+    },
+  }));
+
+});
+
+
+</script>

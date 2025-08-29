@@ -30,3 +30,4 @@ coverage
 *.tsbuildinfo
 
 old/*
+https-test.rb

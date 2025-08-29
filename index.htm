@@ -211,7 +211,7 @@ ul.button-list li button{
   <div id="history" x-data="{console_open:false}">
     <div id="history-console-opener-container">
       <label id="history-console-opener">
-        <input type="checkbox" x-model="console_open">
+        <input type="checkbox" x-model="console_open" value="false">
         <span></span>
       </label>
     </div>
@@ -366,21 +366,26 @@ const dart = (()=>{
             placeName = `${prefName}${muniName}${townName=="−"?"":townName}`; //ハイフンではなく全角マイナス（U+2212）
           }
         }
-        placeName = placeName.replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/　/g,"");
-        const urls = `
-          <a href="${create_googlemaps_url(latlng, zoom)}" target="_blank">Googleマップ</a><br />
-          <a href="${create_gsimaps_url(latlng, zoom)}" target="_blank">地理院地図</a>` + (is_mobile()?`<br />
-          <a href="${create_geouri(latlng, zoom)}" target="_blank">アプリを開く</a>
-          `:"");
-        const shares = `
-          <a href="${create_twitter_share(latlng, placeName)}" target="_blank">&#x1D54F;にポスト</a> | 
-          <a href="${create_share_url(latlng, placeName)}" target="_blank">共有リンク</a>
-          `
+        const popup_text = create_popup(latlng, zoom, placeName);
         setTimeout(()=>{
-          popup = marker.bindPopup(`<strong>${placeName}</strong><br />に、行ってらっしゃい<br /><br />${urls}<br /><br />${shares}`).openPopup();
+          popup = marker.bindPopup(popup_text).openPopup();
         },1000);
       });
     return {latlng, placeName};
+  }
+  
+  function create_popup(latlng=[0,0], zoom=10, placeName="（不明な地点）"){
+    placeName = placeName.replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/　/g,"");
+    const urls = `
+      <a href="${create_googlemaps_url(latlng, zoom)}" target="_blank">Googleマップ</a><br />
+      <a href="${create_gsimaps_url(latlng, zoom)}" target="_blank">地理院地図</a>` + (is_mobile()?`<br />
+      <a href="${create_geouri(latlng, zoom)}" target="_blank">アプリを開く</a>
+      `:"");
+    const shares = `
+      <a href="${create_twitter_share(latlng, placeName)}" target="_blank">&#x1D54F;にポスト</a> | 
+      <a href="${create_share_url(latlng, placeName)}" target="_blank">共有リンク</a>
+      `
+    return `<strong>${placeName}</strong><br />に、行ってらっしゃい<br /><br />${urls}<br /><br />${shares}`;
   }
 
   const area =  (()=>{
