@@ -3,14 +3,20 @@
 <meta charset="utf8">
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=location_on,my_location" />
 
 <div x-data="geo">
+  <div id="map" style="width:500px;height:500px;"></div>
   <div>
     <button @click="start_watch">start watching</button>
     <button @click="get_once">get location (once)</button>
   </div>
-  <div x-text="enabled"></div>
   <div x-text="watching"></div>
   <div x-text="`(${lat}, ${lng})`"></div>
   <ol>
@@ -19,8 +25,122 @@
     </template>
   </ol>
 </div>
-
+<span class="material-symbols-outlined">
+my_location
+</span>
+<span class="material-symbols-outlined">
+location_on
+</span>
 <script>
+
+  const def_center = [35.7270622,139.6227558];
+  const the_map = L.map("map").setView(def_center,5);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(the_map);
+  const marker = L.marker(def_center);
+  marker.addTo(the_map);
+
+function create_button({position="topleft", onclick=()=>{}, oninit=()=>{}, text="", src="", elm=null}){
+  const button = L.Control.extend({
+    options: {
+      position:position
+    },
+    onAdd(map){
+      const wrapper = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+      const link = L.DomUtil.create("a");
+      link.addEventListener("mousedown", e=>{
+        e.stopPropagation();
+      })
+      link.addEventListener("click", e=>{
+        e.stopPropagation();
+        e.preventDefault();
+        onclick(e);
+      });
+      if(elm && elm instanceof HTMLElement){
+        link.append(elm);
+      }
+      else if(src){
+        const img = L.DomUtil.create("img");
+        img.src=src;
+        img.style.cssText = `width:95%;height:95%;object-fit:contain;`
+        link.append(img);
+      }
+      else {
+        link.innerText = text;
+      }
+      wrapper.append(link);
+      oninit(link);
+      return wrapper;
+    }
+  });
+  return new button();
+}
+function create_multi_button({position="topleft", attrs=[]}){
+  const button = L.Control.extend({
+    options: {
+      position:position
+    },
+    onAdd(map){
+      const wrapper = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+      attrs.forEach(attr=>{
+        const {onclick=()=>{}, oninit=()=>{}, text="", src="", elm=null} = attr;
+        const link = L.DomUtil.create("a");
+        link.addEventListener("mousedown", e=>{
+          e.stopPropagation();
+        })
+        link.addEventListener("click", e=>{
+          e.stopPropagation();
+          e.preventDefault();
+          onclick(e);
+        });
+        if(elm && elm instanceof HTMLElement){
+          link.append(elm);
+        }
+        else if(src){
+          const img = L.DomUtil.create("img");
+          img.src=src;
+          img.style.cssText = `width:95%;height:95%;object-fit:contain;`
+          link.append(img);
+        }
+        else {
+          link.innerText = text;
+        }
+        wrapper.append(link);
+        oninit(link);
+      });
+      return wrapper;
+    }
+  });
+  return new button();
+}
+let b = null;
+const btn_test = create_multi_button({
+  position:"bottomright",
+  attrs:[
+    {
+      onclick:()=>{
+        alert('hoge');
+        if(b){
+          b.style.display="block";
+        }
+      },
+      src:"./dart56a.png"
+    },
+    {
+      onclick(e){
+        alert('soge');
+      },
+      oninit(elm){
+        elm.style.display="none";
+        b = elm;
+      },
+      text:"ほ"
+    }
+  ]
+})
+btn_test.addTo(the_map);
 
 document.addEventListener("alpine:init", ()=>{
   Alpine.data("geo", ()=>({
@@ -41,6 +161,8 @@ document.addEventListener("alpine:init", ()=>{
           }
           this.lat = c.latitude;
           this.lng = c.longitude;
+          marker.setLatLng([c.latitude,c.longitude]);
+          the_map.panTo([c.latitude,c.longitude])
           console.log("watch",this.lat,this.lng,c.accuracy);
         }, err=>{
           console.error(err);
@@ -59,6 +181,8 @@ document.addEventListener("alpine:init", ()=>{
         const c = position.coords;
         this.lat = c.latitude;
         this.lng = c.longitude;
+        marker.setLatLng([c.latitude,c.longitude]);
+        the_map.panTo([c.latitude,c.longitude])
         console.log("get",this.lat,this.lng,c.accuracy);
       },err=>{
         console.error(err);
