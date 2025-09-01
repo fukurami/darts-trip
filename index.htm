@@ -393,27 +393,47 @@ const dart = (()=>{
     return `<strong>${placeName}</strong><br />に、行ってらっしゃい<br /><br />${urls}<br /><br />${shares}`;
   }
 
+  const utils = {
+    getMN(latitude_radian=0){
+      const a = 6378.137;
+      const f = 1 / 298.257222101;
+      const e2 = 2*f - f*f;
+      const W = Math.sqrt(1 - e2 * Math.pow(Math.sin(latitude_radian),2));
+      const M = a * (1 - e2) / Math.pow(W,3)
+      const N = a / W;
+      return {M,N};
+    },
+    deg2rad(deg=0){
+      return deg * Math.PI / 180;
+    },
+    rad2deg(rad=0){
+      return rad * 180 / Math.PI;
+    },
+    distance([lat0=0, lng0=0],[lat1=0, lng1=0]){
+      const dlat = utils.deg2rad(lat1 - lat0);
+      const dlng = utils.deg2rad(lng1 - lng1);
+      const lat_mid = utils.deg2rad((lat0 + lat1) / 2);
+      const {M, N} = utils.getMN(lat_mid);
+      return Math.sqrt( Math.pow(M * dlat, 2) + Math.pow(N * dlng * Math.cos(lat_mid), 2));
+    }
+  }
+  
   const area =  (()=>{
     const circle = L.circle(def_center, {radius:50 * 1000});
     let show_circle = false;
     function get_random_point(ll,radius){
       const angle = Math.random() * 2 * Math.PI; //radian
       const dist = Math.random() * radius; //km
-      const lat_rad = ll[0] * Math.PI / 180; //radian
-      const lng_rad = ll[1] * Math.PI / 180; //radian
+      const lat_rad = utils.deg2rad(ll[0]); //radian
+      const lng_rad = utils.deg2rad(ll[1]); //radian
 
-      const a = 6378.137;
-      const f = 1 / 298.257222101;
-      const e2 = 2*f - f*f;
-      const W = Math.sqrt(1 - e2 * Math.pow(Math.sin(lat_rad),2));
-      const M = a * (1 - e2) / Math.pow(W,3)
-      const N = a / W;
+      const {M, N} = utils.getMN(lat_rad);
 
       const dlat = dist * Math.cos(angle) / M; //radian
       const dlng = dist * Math.sin(angle) / (N * Math.cos(lat_rad)); //radian
       
-      const lat2 = (lat_rad + dlat) * 180 / Math.PI;
-      const lng2 = (lng_rad + dlng) * 180 / Math.PI;
+      const lat2 = utils.rad2deg(lat_rad + dlat);
+      const lng2 = utils.rad2deg(lng_rad + dlng);
       return [lat2, lng2]
     }
     return {
