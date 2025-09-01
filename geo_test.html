@@ -9,13 +9,50 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
      crossorigin=""></script>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=location_on,my_location" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=location_on,location_searching,my_location" />
+<style>
+  .geo-button{
+    display:flex;
+    justify-content: center;
+    align-items: center;
+    font-size:24px;
+    color:#666 !important;
+    cursor: pointer;
+  }
+  .geo-button.geo-button-on {
+    color:#fff !important;
+    background-color: #66f;
+  }
+  .geo-button.geo-button-on:hover{
+    background-color: #99f;
+
+  }
+  .geo-button.geo-button-hidden {
+    display:none;
+  }
+  .geo-button.geo-button-loading {
+    animation-name:loadingblink;
+    animation-duration: 0.5s;
+    animation-direction: alternate;
+    animation-iteration-count: infinite;
+    animation-timing-function: ease-in-out;
+  }
+  @keyframes loadingblink {
+    from {
+      background-color:#fff;
+    }
+    to {
+      background-color:#ccf;
+    }
+  }
+
+</style>
 
 <div x-data="geo">
   <div id="map" style="width:500px;height:500px;"></div>
   <div>
-    <button @click="start_watch">start watching</button>
-    <button @click="get_once">get location (once)</button>
+    <button @click="geolocation.toggle_watch()">start watching</button>
+    <button @click="geolocation.get_once()">get location (once)</button>
   </div>
   <div x-text="watching"></div>
   <div x-text="`(${lat}, ${lng})`"></div>
@@ -41,6 +78,136 @@ location_on
   }).addTo(the_map);
   const marker = L.marker(def_center);
   marker.addTo(the_map);
+
+
+const geolocation = (()=>{
+  let watching = false;
+  let watch_id;
+  let loading = false;
+  let lat = 0;
+  let lng = 0;
+  const geo_marker = L.circleMarker(def_center,{
+    radius:7,
+    weight:2,
+    color:"#fff",
+    fillColor:"#66f",
+    fillOpacity:1.0
+  });
+  let button_container, gps_button, mylocation_button;
+  const buttons = L.Control.extend({
+    options:{
+      position:"bottomright"
+    },
+    onAdd(){
+      button_container = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+      mylocation_button = L.DomUtil.create("a", "material-symbols-outlined geo-button geo-button-hidden",button_container);
+      gps_button = L.DomUtil.create("a", "material-symbols-outlined geo-button",button_container);
+      [gps_button,mylocation_button].forEach(elm=>{
+        elm.addEventListener("mousedown", e=>e.stopPropagation());
+        elm.addEventListener("click", e=>{
+          e.stopPropagation();
+          e.preventDefault();
+        })
+        elm.style.cssText = "font-size:24px;";
+      });
+      gps_button.innerText = `location_on`;
+      gps_button.addEventListener("click",()=>{
+        toggle_watch();
+      });
+      mylocation_button.innerText = `location_searching`;
+      mylocation_button.addEventListener("click",()=>{
+        moveto_mylocation();
+      });
+      return button_container;
+    }
+  });
+  const geo_buttons = new buttons();
+  the_map.addControl(geo_buttons);
+
+  function toggle_watch(){
+    if(!watching){
+      start_watch();
+    }
+    else if(watch_id){
+      clear_watch();
+    }
+  }
+  function start_watch(){
+    if(watching) return;
+    loading = true;
+    gps_button.classList.add("geo-button-loading");
+    const id = navigator.geolocation.watchPosition(position=>{
+      if(loading){
+        gps_button.classList.remove("geo-button-loading");
+        loading = false;
+      }
+      watching = true;
+      gps_button.classList.add("geo-button-on");
+      mylocation_button.classList.remove("geo-button-hidden");
+      const c = position.coords;
+      if(lat != c.latitude || lng != c.longitude){
+        onmove_funcs.forEach(func=>{func([c.latitude, c.longitude],[lat, lng])})
+      }
+      lat = c.latitude;
+      lng = c.longitude;
+      geo_marker.addTo(the_map)
+      geo_marker.setLatLng([c.latitude,c.longitude]);
+      //console.log("watch",this.lat,this.lng,c.accuracy);
+    }, err=>{
+      if(loading){
+        gps_button.classList.remove("geo-button-loading");
+        loading = false;
+      }
+      console.error(err);
+    }, {enableHighAccuracy:true});
+    watch_id = id;
+  }
+  function clear_watch(){
+    if(!watching) return;
+    navigator.geolocation.clearWatch(watch_id);
+    gps_button.classList.remove("geo-button-on");
+    mylocation_button.classList.add("geo-button-hidden");
+    geo_marker.remove();
+    watching = false;
+    watch_id = null;
+  }
+  function get_once(moveto_location=false){
+    return new Promise((resolve,reject)=>{
+      navigator.geolocation.getCurrentPosition(position=>{
+        const c = position.coords;
+        lat = c.latitude, lng = c.longitude;
+        geo_marker.addTo(the_map);
+        geo_marker.setLatLng([c.latitude,c.longitude]);
+        if(moveto_location) the_map.panTo([c.latitude,c.longitude]);
+        console.log("get",lat,lng,c.accuracy);
+        resolve([c.latitude,c.longitude]);
+      },err=>{
+        reject(err);
+      })
+    })
+  }
+  function moveto_mylocation(){
+    if(watching){
+      the_map.panTo([lat,lng])
+    }
+  }
+  const onmove_funcs = [];
+  function onmove(func){
+    if(func && typeof func == "function"){
+      onmove_funcs.push(func);
+    }
+  }
+  return {
+    toggle_watch,
+    start_watch,
+    clear_watch,
+    get_once,
+    moveto_mylocation,
+    onmove
+  }
+
+})();
+
 
 function create_button({position="topleft", onclick=()=>{}, oninit=()=>{}, text="", src="", elm=null}){
   const button = L.Control.extend({
@@ -140,7 +307,7 @@ const btn_test = create_multi_button({
     }
   ]
 })
-btn_test.addTo(the_map);
+//btn_test.addTo(the_map);
 
 document.addEventListener("alpine:init", ()=>{
   Alpine.data("geo", ()=>({

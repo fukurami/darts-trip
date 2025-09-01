@@ -348,6 +348,7 @@ const dart = (()=>{
     the_map.flyTo(latlng, zoom, {animate:true});  
     if(nopopup) return;
     let placeName = "";
+    const start_time = Date.now();
     await fetch(`https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${latlng[0]}&lon=${latlng[1]}`)
       .then(resp=>resp.json())
       .then(json=>{
@@ -356,7 +357,6 @@ const dart = (()=>{
           placeName = "（不明な地点）"
         }
         else{
-          //console.log(json.results);
           const muniCd = json.results.muniCd;
           const muni = Muni.get(muniCd);
           if(!muni){
@@ -371,9 +371,10 @@ const dart = (()=>{
           }
         }
         const popup_text = create_popup(latlng, zoom, placeName);
+        const timeout = Math.max(1000-(Date.now()-start_time),0)
         setTimeout(()=>{
           popup = marker.bindPopup(popup_text).openPopup();
-        },1000);
+        }, timeout);
       });
     return {latlng, placeName};
   }
