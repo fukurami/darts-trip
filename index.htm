@@ -570,6 +570,33 @@ const dart = (()=>{
     }
   })();
 
+  const history_layer = (()=>{
+    let count = 0;
+    const features = [];
+    const layer_group = L.layerGroup();
+    function init(history){
+      history.forEach(hist=>{
+        add(hist.latlng, hist.placeName);
+      });
+      layer_group.addTo(the_map);
+    }
+    function add(latlng, placeName){
+      const id = count++;
+      const m = L.circleMarker(latlng);
+      m.bindPopup("");
+      features.push({id:id, marker:m});
+      layer_group.addLayer(m);
+      return id;
+    }
+    function remove(id){
+      const index = features.findIndex(f=>f.id==id);
+      if(index != -1){
+        const feature = features.splice(index, 1);
+        layer_group.remove(feature.marker);
+      }
+    }
+  })();
+
   return {
     put_marker,
     area,
@@ -731,9 +758,9 @@ ${placemarks.join("\r\n")}
         if(ll){
           ll = decodeURIComponent(ll);
           const match = ll.match(/^(\d+(?:\.\d+)?),(\d+(?:\.\d+)?)$/);
-          const lat = parseFloat(match[1]);
-          const lng = parseFloat(match[2]);
           if(match){
+            const lat = parseFloat(match[1]);
+            const lng = parseFloat(match[2]);
             const obj = await dart.put_marker([lat,lng]);
             this.add_history({mode:"url", ...obj});
           }
