@@ -224,6 +224,7 @@ ul.button-list li button{
     <div id="history-console" x-show="console_open">
       <button @click="clear_history">履歴をクリア</button>
       <button @click="$refs.history_export_dialog.showModal()">エクスポート</button>
+      <label><input type="checkbox" x-model="show_history_layer" @change="toggle_history_layer">地図に表示</label>
     </div>
     <dialog id="history-export-dialog" x-ref="history_export_dialog">
       <h4 class="dialog-title">履歴をエクスポート</h4>
@@ -572,29 +573,47 @@ const dart = (()=>{
   })();
 
   const history_layer = (()=>{
-    let count = 0;
     const features = [];
     const layer_group = L.layerGroup();
-    function init(history){
+    function init(history=[], show_layer=false){
       history.forEach(hist=>{
-        add(hist.latlng, hist.placeName);
+        add(hist.latlng, hist.placeName, hist.id);
       });
-      layer_group.addTo(the_map);
+      if(show_layer){
+        layer_group.addTo(the_map);
+      }
     }
-    function add(latlng, placeName){
-      const id = count++;
-      const m = L.circleMarker(latlng);
-      m.bindPopup("");
-      features.push({id:id, marker:m});
+    function add(latlng, placeName,id){
+      const m = L.circleMarker(latlng, {
+        radius:5,
+        weight:1,
+        color:"#fff",
+        fillColor:"#f66",
+        fillOpacity:1.0
+      });
+      m.bindPopup(create_popup(latlng, 10, placeName));
+      features.push({id, marker:m});
       layer_group.addLayer(m);
-      return id;
     }
     function remove(id){
       const index = features.findIndex(f=>f.id==id);
       if(index != -1){
         const feature = features.splice(index, 1);
-        layer_group.remove(feature.marker);
+        layer_group.removeLayer(feature[0].marker);
       }
+    }
+    function show(){
+      layer_group.addTo(the_map);
+    }
+    function hide(){
+      layer_group.removeFrom(the_map);
+    }
+    return {
+      init,
+      add,
+      remove,
+      show,
+      hide,
     }
   })();
 
@@ -602,7 +621,8 @@ const dart = (()=>{
     put_marker,
     area,
     japan,
-    prefs
+    prefs,
+    history_layer
   }
 })();
 
@@ -643,16 +663,22 @@ document.addEventListener("alpine:init", ()=>{
         this.add_history({mode:"area", ...obj});
       }
     },
+    history_count:0,
     add_history({mode, latlng, placeName}){
-      this.history.unshift({mode, latlng, placeName, time:Date.now()});
+      const id = this.history_count++
+      this.history.unshift({mode, latlng, placeName, time:Date.now(), id});
       this.save_history();
+      dart.history_layer.add(latlng, placeName, id)
     },
     restore_history(i){
       const hist = this.history[i];
       dart.put_marker(hist.latlng);
     },
     delete_history(i){
+      const id = this.history[i].id;
+      //console.log(id);
       this.history.splice(i,1);
+      dart.history_layer.remove(id);
       this.save_history();
     },
     save_history(){
@@ -661,12 +687,25 @@ document.addEventListener("alpine:init", ()=>{
     load_history(){
       if(localStorage.getItem("dart_history")){
         this.history = JSON.parse(localStorage.getItem("dart_history"));
+        for (let i=0; i < this.history.length; i++){
+          this.history[i].id = this.history_count++;
+        }
       }
+      dart.history_layer.init(this.history);
     },
     clear_history(){
       if(confirm("履歴を全て削除しますか?")){
         this.history.length = 0;
       }      
+    },
+    show_history_layer:false,
+    toggle_history_layer(){
+      if(this.show_history_layer){
+        dart.history_layer.show();
+      }
+      else{
+        dart.history_layer.hide();
+      }
     },
     create_history_CSV(){
       const column_separator = ",";
