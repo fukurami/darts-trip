@@ -145,7 +145,7 @@ body{
 #history-list button:hover {
   color: #f33;
 }
-#history-export-dialog {
+#history-export-dialog, dialog {
   border:none;
   border-radius:10px;
   padding:10px;
@@ -233,6 +233,37 @@ ul.button-list li button{
 <h1 id="title">日本列島をダーツで旅するやつ</h1>
 <main id="main" x-data="dart">
   <div id="map"></div>
+  <dialog id="checkin-dialog" style="background-color:#fe6;">
+    <h4 class="dialog-title">
+      Congratulations!
+    </h4>
+    <div style="margin:2em 1em">
+      <span class="checkin-placeName"></span><br>
+      へ到着おめでとうございます！
+    </div>
+    <div style="margin:2em 1em">
+      距離：<span class="checkin-distance"></span>
+    </div>
+    <div  style="margin:2em 1em">
+      <a href="#">&#x1D54F;に報告する</a>
+    </div>
+    <form method="dialog" style="margin-bottom:10px;">
+      <button value="close" class="dialog-close-button">閉じる</button>
+    </form>
+  </dialog>
+  <dialog id="checkin-failure-dialog">
+    <h4 class="dialog-title">未到達</h4>
+    <div style="margin:1em">
+      <span class="checkin-placeName"></span><br>
+      へはまだ到達していないようです……
+    </div>
+    <div style="margin:1em">
+      距離：<span class="checkin-distance"></span>
+    </div>
+    <form method="dialog" style="margin-bottom:10px;">
+      <button value="close" class="dialog-close-button">閉じる</button>
+    </form>
+  </dialog>
   <div id="console">
     <button class="dart-button" @click="throw_dart">ダーツを投げる🎯</button>
     <div id="options">
@@ -443,10 +474,13 @@ const dart = (()=>{
     const container = L.DomUtil.create("div");
     const mainelm = L.DomUtil.create("div","popup-main", container);
     mainelm.innerHTML = `<strong>${placeName}</strong><br />に、行ってらっしゃい<br /><br />${urls}<br /><br />${shares}`;
-    
+
     const consoleelm = L.DomUtil.create("div","popup-console", container);
     const checkinbutton = L.DomUtil.create("button","",consoleelm);
-    checkinbutton.innerText = "ここに着いた"
+    checkinbutton.innerText = "着いた";
+    checkinbutton.addEventListener("click",e=>{
+      checkin(latlng, placeName);
+    })
     if(history && deletefunc){
       const deletebutton = L.DomUtil.create("span","material-symbols-outlined popup-delete-button",consoleelm);
       deletebutton.innerText="delete";
@@ -457,6 +491,18 @@ const dart = (()=>{
       });
     }
     return container;
+  }
+
+  function checkin(latlng, placeName){
+    geolocation.get_once(false).then(loc=>{
+      const dist = utils.distance(loc, latlng);
+      console.log(dist);
+      if(dist < 0.5){
+        console.log("congratulations!")
+      }
+    }).catch(err=>{
+      alert("位置情報を許可してください")
+    })
   }
 
   const utils = {
@@ -475,7 +521,7 @@ const dart = (()=>{
     rad2deg(rad=0){
       return rad * 180 / Math.PI;
     },
-    distance([lat0=0, lng0=0],[lat1=0, lng1=0]){
+    distance([lat0=0, lng0=0],[lat1=0, lng1=0]){//latlng -> km
       const dlat = utils.deg2rad(lat1 - lat0);
       const dlng = utils.deg2rad(lng1 - lng1);
       const lat_mid = utils.deg2rad((lat0 + lat1) / 2);
