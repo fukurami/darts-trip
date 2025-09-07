@@ -23,7 +23,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script src="./pointPolygonIntersection.js"></script>
 <script src="./muni.js"></script>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=location_on,location_searching,my_location" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=delete,location_on,location_searching,my_location" />
 <style>
 .dart-button {
 	display: block;
@@ -153,6 +153,17 @@ body{
   box-shadow: 0 0 3px #666;
   min-width:240px;
 }
+
+.popup-console {
+  margin-top:1em;
+}
+.popup-delete-button{
+	float: right;
+	color: #666;
+	cursor: pointer;
+	font-size: 20px;
+}
+
 ul.button-list {
   list-style-type: none;
   padding:5px;
@@ -409,7 +420,7 @@ const dart = (()=>{
             placeName = `${prefName}${muniName}${townName=="−"?"":townName}`; //ハイフンではなく全角マイナス（U+2212）
           }
         }
-        const popup_text = create_popup(latlng, zoom, placeName);
+        const popup_text = create_popup({latlng, zoom, placeName});
         const timeout = Math.max(1000-(Date.now()-start_time),0)
         setTimeout(()=>{
           popup = marker.bindPopup(popup_text).openPopup();
@@ -418,7 +429,7 @@ const dart = (()=>{
     return {latlng, placeName};
   }
   
-  function create_popup(latlng=[0,0], zoom=10, placeName="（不明な地点）"){
+  function create_popup({latlng=[0,0], zoom=10, placeName="（不明な地点）", history=false, deletefunc}){
     placeName = placeName.replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/　/g,"");
     const urls = `
       <a href="${create_googlemaps_url(latlng, zoom)}" target="_blank">Googleマップ</a><br />
@@ -429,7 +440,23 @@ const dart = (()=>{
       <a href="${create_twitter_share(latlng, placeName)}" target="_blank">&#x1D54F;にポスト</a> | 
       <a href="${create_share_url(latlng, placeName)}" target="_blank">共有リンク</a>
       `
-    return `<strong>${placeName}</strong><br />に、行ってらっしゃい<br /><br />${urls}<br /><br />${shares}`;
+    const container = L.DomUtil.create("div");
+    const mainelm = L.DomUtil.create("div","popup-main", container);
+    mainelm.innerHTML = `<strong>${placeName}</strong><br />に、行ってらっしゃい<br /><br />${urls}<br /><br />${shares}`;
+    
+    const consoleelm = L.DomUtil.create("div","popup-console", container);
+    const checkinbutton = L.DomUtil.create("button","",consoleelm);
+    checkinbutton.innerText = "ここに着いた"
+    if(history && deletefunc){
+      const deletebutton = L.DomUtil.create("span","material-symbols-outlined popup-delete-button",consoleelm);
+      deletebutton.innerText="delete";
+      deletebutton.addEventListener("click", e=>{
+        if(confirm("削除しますか?")){
+          deletefunc()
+        }
+      });
+    }
+    return container;
   }
 
   const utils = {
@@ -612,13 +639,15 @@ const dart = (()=>{
   const history_layer = (()=>{
     const features = [];
     const layer_group = L.layerGroup();
-    function init(history=[], show_layer=false){
+    let alpinedelete = null;
+    function init(history=[], show_layer=false, deletefunc){
       history.forEach(hist=>{
         add(hist.latlng, hist.placeName, hist.id);
       });
       if(show_layer){
         layer_group.addTo(the_map);
       }
+      alpinedelete = deletefunc;
     }
     function add(latlng, placeName,id){
       const m = L.circleMarker(latlng, {
@@ -628,7 +657,7 @@ const dart = (()=>{
         fillColor:"#f66",
         fillOpacity:1.0
       });
-      m.bindPopup(create_popup(latlng, 10, placeName));
+      m.bindPopup(create_popup({latlng, zoom:10, placeName, history:true, deletefunc:()=>{ remove_from_popup(id) }}));
       features.push({id, marker:m});
       layer_group.addLayer(m);
     }
@@ -638,6 +667,10 @@ const dart = (()=>{
         const feature = features.splice(index, 1);
         layer_group.removeLayer(feature[0].marker);
       }
+    }
+    function remove_from_popup(id){
+      alpinedelete(id);
+      remove(id)
     }
     function show(){
       layer_group.addTo(the_map);
@@ -847,6 +880,12 @@ document.addEventListener("alpine:init", ()=>{
       dart.history_layer.remove(id);
       this.save_history();
     },
+    delete_history_byid(id){
+      const i = this.history.findIndex(h=>h.id==id);
+      if(i != -1){
+        this.delete_history(i);
+      }
+    },
     save_history(){
       localStorage.setItem("dart_history", JSON.stringify(this.history));
     },
@@ -857,7 +896,7 @@ document.addEventListener("alpine:init", ()=>{
           this.history[i].id = this.history_count++;
         }
       }
-      dart.history_layer.init(this.history);
+      dart.history_layer.init(this.history,false,(id)=>{this.delete_history_byid(id)});
     },
     clear_history(){
       if(confirm("履歴を全て削除しますか?")){
