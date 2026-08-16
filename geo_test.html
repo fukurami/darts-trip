@@ -9,6 +9,8 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
      crossorigin=""></script>
+<script src="./leaflet.edgebuffer.js"></script>
+<script src="./dom-to-image-more.min.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=location_on,location_searching,my_location" />
 <style>
   .geo-button{
@@ -53,6 +55,7 @@
   <div>
     <button @click="geolocation.toggle_watch()">start watching</button>
     <button @click="geolocation.get_once()">get location (once)</button>
+    <button @click="captureimage()">capture</button>
   </div>
   <div x-text="watching"></div>
   <div x-text="`(${lat}, ${lng})`"></div>
@@ -68,17 +71,22 @@ my_location
 <span class="material-symbols-outlined">
 location_on
 </span>
+<div id="captureoutput"></div>
+
 <script>
 
   const def_center = [35.7270622,139.6227558];
   const the_map = L.map("map").setView(def_center,5);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      crossOrigin: 'anonymous',
+      edgeBuferTiles: 2
   }).addTo(the_map);
   const marker = L.marker(def_center);
   marker.addTo(the_map);
 
+marker.bindPopup("hoge",{className:"hoge"})
 
 const geolocation = (()=>{
   let watching = false;
@@ -308,6 +316,166 @@ const btn_test = create_multi_button({
   ]
 })
 //btn_test.addTo(the_map);
+
+const captureimage = (()=>{
+  async function captureimage(map, title_text = "日本列島をダーツで旅するやつ", place_text = "熊本県八代市郡築十一番町に、行ってらっしゃい", latlng){
+    const mapelm = the_map.getContainer();
+    latlng = (center=>[center.lat, center.lng])(the_map.getCenter());
+    /*let canvas = await html2canvas(mapelm, {
+      useCORS: true,
+      allowTaint: false,
+      scale: window.devicePixelRatio || 1, 
+      backgroundColor: null,
+      logging: false,
+      windowWidth:800,
+      ignoreElements: (el)=>{
+        return el.classList.contains('leaflet-control-container')
+          //||el.classList.contains("leaflet-popup");
+      }
+    });*/
+
+    const target_width = 600;
+    const target_height = 800;
+
+    const current_width = mapelm.clientWidth;
+    const current_height = mapelm.clientHeight;
+    const dx = Math.round((target_width - current_width)/2);
+    const dy = Math.round((target_height - current_height)/2);
+
+    let canvas = await domtoimage.toCanvas(mapelm, {
+      cacheBust: true,
+      width:target_width,
+      height:target_height,
+      //scale:1.5,
+      pixelRatio: window.devicePixelRatio || 1,
+      bgcolor: null,
+      preserveScroll: true,
+      loadExternalStyleSheet:true,
+      adjustClonedNode: (node,clone,after)=>{
+        if(node.classList && node.classList.contains("leaflet-map-pane")){
+          console.log("clone", clone);
+          clone.style.translate = `${dx}px ${dy}px`;
+          //await new Promise(resolve=>setTimeout(resolve,500));
+        }
+      },
+      filter: (node) => {
+        if (node.classList && node.classList.contains('leaflet-control-container')) {
+          return false;
+        }
+        else if(node.src){
+          if(/data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAACMAAAA/.exec(node.src)){
+            return false;
+          }
+        }
+        return true;
+      }
+    })
+    
+  //  document.querySelector("#captureoutput").innerHTML="";
+  //  document.querySelector("#captureoutput").appendChild(canvas);
+
+    canvas = cropAndResize(canvas, target_width, target_height-24-18);
+    canvas = appendBanner(canvas, target_width, target_height, title_text, 24, place_text, 18, latlng, 16);
+
+    document.querySelector("#captureoutput").innerHTML="";
+    document.querySelector("#captureoutput").appendChild(canvas);
+    
+    canvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `map-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 'image/png'); 
+  }
+  function cropAndResize(canvas, targetWidth = 720, targetHeight = 960) {
+    const targetRatio = targetWidth / targetHeight; 
+    const srcRatio = canvas.width / canvas.height;
+
+    let cropWidth, cropHeight;
+    if (srcRatio > targetRatio) { // 元画像が横長すぎる → 高さ基準でクロップ幅を決める
+      cropHeight = canvas.height;
+      cropWidth = cropHeight * targetRatio;
+    } else { // 元画像が縦長すぎる(または一致) → 幅基準でクロップ高さを決める
+      cropWidth = canvas.width;
+      cropHeight = cropWidth / targetRatio;
+    }
+
+    const sx = (canvas.width - cropWidth) / 2;
+    const sy = (canvas.height - cropHeight) / 2;
+
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = targetWidth;
+    outCanvas.height = targetHeight;
+
+    const ctx = outCanvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    ctx.drawImage(
+      canvas,
+      sx, sy, cropWidth, cropHeight, // 元画像からの切り取り範囲
+      0, 0, targetWidth, targetHeight // 出力先へのリサイズ描画
+    );
+    return outCanvas;
+  }
+
+  function appendBanner(canvas, width=720, height=960, bannerText="日本列島をダーツで旅するやつ", bannerHeight=24, subBannerText="", subBannerHeight=16, latlng, subBannerHeight2=16){
+    const newCanvas = document.createElement("canvas");
+    newCanvas.width = width;
+    newCanvas.height = height;
+    if(!subBannerText){
+      subBannerHeight = 0;
+    }
+    if(!latlng){
+      subBannerHeight2 = 0;
+    }
+    const context = newCanvas.getContext("2d");
+    context.fillStyle = "#a00";
+    context.fillRect(0, 0, width, bannerHeight+subBannerHeight+subBannerHeight2);
+    
+    context.fillStyle = "#fff";
+    context.textAlign = "center";
+    context.font = `bold ${Math.round(bannerHeight * 0.8)}px serif`;
+    context.fillText(bannerText, width/2, Math.round(bannerHeight * 0.8), width);
+
+    if(subBannerText){
+      context.strokeStyle ="#fff";
+      const lineLength = Math.round(width * 0.3);
+      context.moveTo((width-lineLength)/2, bannerHeight);
+      context.lineTo((width-lineLength)/2+lineLength, bannerHeight);
+    //  context.stroke();
+      context.font = `${Math.round(subBannerHeight * 0.9)-3}px serif`;
+      context.fillText(subBannerText, width/2, bannerHeight + Math.round(subBannerHeight * 0.9)-3, width);
+    }
+    if(latlng){
+      context.font = `${Math.round(subBannerHeight2 * 0.9)-3}px serif`;
+      context.fillText(`（緯度:${latlng[0].toFixed(6)}, 経度:${latlng[1].toFixed(6)}）`, width/2, bannerHeight + subBannerHeight + Math.round(subBannerHeight2 * 0.9)-3, width);
+    }
+
+    context.drawImage(canvas, 0, bannerHeight+subBannerHeight+subBannerHeight2);
+
+    const contribution = "©Openstreetmap Contributors";
+    context.font = "12px sans-serif";
+    context.textAlign = "left";
+    const text_width = context.measureText(contribution).width;
+
+    context.fillStyle = "#fff";
+    context.fillRect(width-text_width-2,height-16,text_width+2,16);
+    context.fillStyle = "#333";
+    context.fillText(contribution, width-text_width-2, height-4);
+
+    return newCanvas;
+  }
+  return captureimage;
+})();
+
+
+
+
 
 document.addEventListener("alpine:init", ()=>{
   Alpine.data("geo", ()=>({

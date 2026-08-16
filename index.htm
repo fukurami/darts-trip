@@ -19,10 +19,12 @@
      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
      crossorigin=""></script>
 <script src="https://unpkg.com/leaflet-center-cross@0.0.8/dist/leaflet.CenterCross.js"></script>
+<script src="./leaflet.edgebuffer.js"></script>
 <script src="https://unpkg.com/flatgeobuf/dist/flatgeobuf-geojson.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script src="./pointPolygonIntersection.js"></script>
 <script src="./muni.js"></script>
+<script src="./dom-to-image-more.min.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=delete,location_on,location_searching,my_location" />
 <style>
 .dart-button {
@@ -163,6 +165,28 @@ body{
 	cursor: pointer;
 	font-size: 20px;
 }
+.leaflet-popup.dart-arrival .leaflet-popup-content-wrapper {
+  background-color: #f00;
+}
+.leaflet-popup.dart-arrival .leaflet-popup-tip {
+  background-color: #f00;
+}
+.arrival-message {
+  text-align: center;
+}
+.leaflet-popup.dart-arrival .popup-main {
+  color:#fff;
+}
+.leaflet-popup.dart-arrival .popup-main a{
+  color:#ff0
+}
+.arrival-congrats {
+	font-size: 120%;
+	color: #fffb00;
+}
+.dart-share_urls {
+  margin: 1em 0;
+}
 
 ul.button-list {
   list-style-type: none;
@@ -177,18 +201,6 @@ ul.button-list li button{
 	line-height: 26px;
 	border-radius: 15px;
 	border-width: 1px;
-}
-.dialog-title {
-  font-size:1.2em;
-  margin:0;
-  font-weight:normal
-}
-.dialog-close-button {
-	border: none;
-	padding: 0 10px;
-	background: none;
-	color: blue;
-	text-decoration: underline;
 }
 
 /* geolocation */
@@ -233,37 +245,6 @@ ul.button-list li button{
 <h1 id="title">日本列島をダーツで旅するやつ</h1>
 <main id="main" x-data="dart">
   <div id="map"></div>
-  <dialog id="checkin-dialog" style="background-color:#fe6;">
-    <h4 class="dialog-title">
-      Congratulations!
-    </h4>
-    <div style="margin:2em 1em">
-      <span class="checkin-placeName"></span><br>
-      へ到着おめでとうございます！
-    </div>
-    <div style="margin:2em 1em">
-      距離：<span class="checkin-distance"></span>
-    </div>
-    <div  style="margin:2em 1em">
-      <a href="#">&#x1D54F;に報告する</a>
-    </div>
-    <form method="dialog" style="margin-bottom:10px;">
-      <button value="close" class="dialog-close-button">閉じる</button>
-    </form>
-  </dialog>
-  <dialog id="checkin-failure-dialog">
-    <h4 class="dialog-title">未到達</h4>
-    <div style="margin:1em">
-      <span class="checkin-placeName"></span><br>
-      へはまだ到達していないようです……
-    </div>
-    <div style="margin:1em">
-      距離：<span class="checkin-distance"></span>
-    </div>
-    <form method="dialog" style="margin-bottom:10px;">
-      <button value="close" class="dialog-close-button">閉じる</button>
-    </form>
-  </dialog>
   <div id="console">
     <button class="dart-button" @click="throw_dart">ダーツを投げる🎯</button>
     <div id="options">
@@ -360,12 +341,16 @@ const dart = (()=>{
   const the_map = L.map("map").setView(def_center,5);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      crossOrigin: "anonymous",
+      edgeBuferTiles: 2
   }).addTo(the_map);
-  the_map.addControl(L.control.centerCross({
+  const center_cross = L.control.centerCross({
     show: true,
     position: "topleft"
-  }));
+  });
+  the_map.addControl(center_cross);
+  center_cross.getContainer().classList.add("leaflet-center-cross");
   const dart_icon = L.icon({
     iconUrl: "./dart56a.png",
     iconSize: [53,56],
@@ -378,7 +363,7 @@ const dart = (()=>{
 
   const marker = L.marker(def_center, {icon:dart_icon});
   let show_marker = false;
-  let popup = null;
+  let the_popup = null;
 
   function create_googlemaps_url(latlng, zoom=10){
     const lat = parseFloat(latlng[0]).toFixed(8);
@@ -409,13 +394,18 @@ const dart = (()=>{
     const tweet_text = `【ダーツ旅】私は今から${placeName}に行ってきます！\n`;
     return `https://x.com/intent/tweet?text=${encodeURIComponent(tweet_text)}&url=${encodeURIComponent(share_url)}`;
   }
+  function create_twitter_arrival_share(latlng, placeName="（不明な地点）"){
+    const share_url = create_share_url(latlng, placeName);
+    const tweet_text = `【ダーツ旅】私はダーツの刺さった${placeName}に到着しました！！！\n`;
+    return `https://x.com/intent/tweet?text=${encodeURIComponent(tweet_text)}&url=${encodeURIComponent(share_url)}`;
+  }
   function is_mobile(){
     const mql = window.matchMedia("(max-width: 480px) and (orientation: portrait), (max-height: 480px) and (orientation: landscape)");
     return mql.matches;
   }
 
   async function put_marker(latlng, nopopup=false){
-    if(popup){popup.closePopup();}
+    if(the_popup){the_popup.closePopup();}
     if(!show_marker){
       marker.addTo(the_map);
       show_marker = true;
@@ -451,10 +441,10 @@ const dart = (()=>{
             placeName = `${prefName}${muniName}${townName=="−"?"":townName}`; //ハイフンではなく全角マイナス（U+2212）
           }
         }
-        const popup_text = create_popup({latlng, zoom, placeName});
+        const new_popup = create_popup({latlng, zoom, placeName});
         const timeout = Math.max(1000-(Date.now()-start_time),0)
         setTimeout(()=>{
-          popup = marker.bindPopup(popup_text).openPopup();
+          the_popup = marker.bindPopup(new_popup).openPopup();
         }, timeout);
       });
     return {latlng, placeName};
@@ -470,17 +460,37 @@ const dart = (()=>{
     const shares = `
       <a href="${create_twitter_share(latlng, placeName)}" target="_blank">&#x1D54F;にポスト</a> | 
       <a href="${create_share_url(latlng, placeName)}" target="_blank">共有リンク</a>
-      `
+      `;
+
+    const popup = L.popup();
     const container = L.DomUtil.create("div");
     const mainelm = L.DomUtil.create("div","popup-main", container);
-    mainelm.innerHTML = `<strong>${placeName}</strong><br />に、行ってらっしゃい<br /><br />${urls}<br /><br />${shares}`;
+    mainelm.innerHTML = `
+      <strong>${placeName}</strong><br />
+      に、行ってらっしゃい<br />
+      <div class="dart-share_urls">
+        ${urls}<br /><br />${shares}
+      </div>`;
+
+    const capture_link = document.createElement("a");
+    capture_link.href="javascript:void(0)";
+    capture_link.innerText="シェア用画像をDL";
+    capture_link.addEventListener("click", e=>{
+      captureimage(the_map, "日本列島をダーツで旅するやつ", `${placeName}に、行ってらっしゃい`, latlng);
+    })
+    mainelm.querySelector(".dart-share_urls").append(document.createElement("br"),capture_link);
 
     const consoleelm = L.DomUtil.create("div","popup-console", container);
-    const checkinbutton = L.DomUtil.create("button","",consoleelm);
-    checkinbutton.innerText = "着いた";
-    checkinbutton.addEventListener("click",e=>{
-      checkin(latlng, placeName);
-    })
+    //if(geolocation.is_watching()){
+      const checkinbutton = L.DomUtil.create("a","",consoleelm);
+      checkinbutton.href="javascript:void(0)";
+      checkinbutton.innerText = "この場所に着いた";
+      checkinbutton.addEventListener("click",e=>{
+        e.preventDefault();
+        e.stopPropagation();
+        checkin(latlng, zoom, placeName, popup, history);
+      })
+    //}
     if(history && deletefunc){
       const deletebutton = L.DomUtil.create("span","material-symbols-outlined popup-delete-button",consoleelm);
       deletebutton.innerText="delete";
@@ -490,15 +500,66 @@ const dart = (()=>{
         }
       });
     }
+    popup.setContent(container);
+    return popup;
+  }
+
+  function create_arrival_popup_content({latlng=[0,0], zoom=10, placeName="（不明な地点）", distance=100}){
+    placeName = placeName.replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/　/g,"");
+    const urls = `
+      <a href="${create_googlemaps_url(latlng, zoom)}" target="_blank">Googleマップ</a><br />
+      <a href="${create_gsimaps_url(latlng, zoom)}" target="_blank">地理院地図</a>` + (is_mobile()?`<br />
+      <a href="${create_geouri(latlng, zoom)}" target="_blank">アプリを開く</a>
+      `:"");
+    const shares = `
+      <a href="${create_twitter_arrival_share(latlng, placeName)}" target="_blank">&#x1D54F;に報告</a> | 
+      <a href="${create_share_url(latlng, placeName)}" target="_blank">共有リンク</a>
+      `;
+      
+    const container = L.DomUtil.create("div");
+    const mainelm = L.DomUtil.create("div","popup-main", container);
+    mainelm.innerHTML = `
+      <div class="arrival-message">
+        <strong class="arrival-congrats">Congratulations!</strong><br /><br/>
+        <strong>${placeName}</strong><br />に、到着しました!!!!<br />
+        <small>（距離：${parseInt((distance*1000))}メートル）</small>
+      </div>
+      <div class="dart-share_urls">
+        ${urls}<br /><br />${shares}
+      </div>`;
+      
+    const capture_link = document.createElement("a");
+    capture_link.href="javascript:void(0)";
+    capture_link.innerText="シェア用画像をDL";
+    capture_link.addEventListener("click", e=>{
+      captureimage(the_map, "日本列島をダーツで旅するやつ", `${placeName}に、到着しました！！！！`, latlng);
+    })
+    mainelm.querySelector(".dart-share_urls").append(document.createElement("br"),capture_link);
+
+
     return container;
   }
 
-  function checkin(latlng, placeName){
+  function checkin(latlng, zoom, placeName, popup, history){
+    console.log(popup);
+    if(true){
+        const popupElm = popup.getElement();
+        popupElm.classList.add("dart-arrival")
+        const old_content = popup.getContent();
+        popup.once("popupclose", e=>{
+          popupElm.classList.remove("dart-arrival");
+          popup.setContent(old_content);
+        });
+        const arrival_popup = create_arrival_popup_content({latlng, zoom, placeName, distance:0.375});
+        popup.setContent(arrival_popup);
+    }
     geolocation.get_once(false).then(loc=>{
       const dist = utils.distance(loc, latlng);
-      console.log(dist);
       if(dist < 0.5){
-        console.log("congratulations!")
+        console.log("congratulations!");
+      }
+      else{
+        alert(`まだ着いていないようです……\n（距離：${parseInt(dist*1000)}メートル）`);
       }
     }).catch(err=>{
       alert("位置情報を許可してください")
@@ -703,8 +764,9 @@ const dart = (()=>{
         fillColor:"#f66",
         fillOpacity:1.0
       });
-      m.bindPopup(create_popup({latlng, zoom:10, placeName, history:true, deletefunc:()=>{ remove_from_popup(id) }}));
-      features.push({id, marker:m});
+      const popup = create_popup({latlng, zoom:10, placeName, history:true, deletefunc:()=>{ remove_from_popup(id) }});
+      m.bindPopup(popup);
+      features.push({id, marker:m, popup});
       layer_group.addLayer(m);
     }
     function remove(id){
@@ -724,12 +786,16 @@ const dart = (()=>{
     function hide(){
       layer_group.removeFrom(the_map);
     }
+    function get_feature(id){
+      return features.find(f=>f.id==id);
+    }
     return {
       init,
       add,
       remove,
       show,
       hide,
+      get_feature,
     }
   })();
 
@@ -850,16 +916,158 @@ const dart = (()=>{
         onmove_funcs.push(func);
       }
     }
+    function is_watching(){
+      return watching;
+    }
     return {
       toggle_watch,
       start_watch,
       clear_watch,
       get_once,
       moveto_mylocation,
-      onmove
+      onmove,
+      is_watching
     }
 
   })();
+
+  const captureimage = (()=>{
+    async function captureimage(map, title_text = "日本列島をダーツで旅するやつ", place_text = "熊本県八代市郡築十一番町に、行ってらっしゃい", latlng){
+    const mapelm = map.getContainer();
+
+    const target_width = 540;
+    const target_height = 720;
+
+    const current_width = mapelm.clientWidth;
+    const current_height = mapelm.clientHeight;
+    const dx = Math.round((target_width - current_width)/2);
+    const dy = Math.round((target_height - current_height)/2);
+
+    let canvas = await domtoimage.toCanvas(mapelm, {
+      cacheBust: true,
+      width:target_width,
+      height:target_height,
+      //scale:1.5,
+      pixelRatio: window.devicePixelRatio || 1,
+      bgcolor: null,
+      preserveScroll: true,
+      loadExternalStyleSheet:true,
+      adjustClonedNode: (node,clone,after)=>{
+        if(node.classList && node.classList.contains("leaflet-map-pane")){
+          console.log("clone", clone);
+          clone.style.translate = `${dx}px ${dy}px`;
+        }
+      },
+      filter: (node) => {
+        if (node.classList && (
+            node.classList.contains('leaflet-control-container')
+          //  || node.classList.contains("dart-share_urls")
+          //  || node.classList.contains("popup-console")
+          )) {
+          return false;
+        }
+        else if(node.src){
+          if(/data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAACMAAAA/.exec(node.src)){
+            return false;
+          }
+        }
+        return true;
+        }
+      })
+      canvas = cropAndResize(canvas, target_width, target_height-24-18);
+      canvas = appendBanner(canvas, target_width, target_height, title_text, 24, place_text, 18, latlng, 16);      
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `darts-${Date.now()}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 'image/png'); 
+    }
+    function cropAndResize(canvas, targetWidth = 720, targetHeight = 960) {
+      const targetRatio = targetWidth / targetHeight; 
+      const srcRatio = canvas.width / canvas.height;
+
+      let cropWidth, cropHeight;
+      if (srcRatio > targetRatio) { // 元画像が横長すぎる → 高さ基準でクロップ幅を決める
+        cropHeight = canvas.height;
+        cropWidth = cropHeight * targetRatio;
+      } else { // 元画像が縦長すぎる(または一致) → 幅基準でクロップ高さを決める
+        cropWidth = canvas.width;
+        cropHeight = cropWidth / targetRatio;
+      }
+
+      const sx = (canvas.width - cropWidth) / 2;
+      const sy = (canvas.height - cropHeight) / 2;
+
+      const outCanvas = document.createElement('canvas');
+      outCanvas.width = targetWidth;
+      outCanvas.height = targetHeight;
+
+      const ctx = outCanvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      ctx.drawImage(
+        canvas,
+        sx, sy, cropWidth, cropHeight, // 元画像からの切り取り範囲
+        0, 0, targetWidth, targetHeight // 出力先へのリサイズ描画
+      );
+      return outCanvas;
+    }
+
+    function appendBanner(canvas, width=720, height=960, bannerText="", bannerHeight=24, subBannerText="", subBannerHeight=16, latlng, subBannerHeight2=16){
+      const newCanvas = document.createElement("canvas");
+      newCanvas.width = width;
+      newCanvas.height = height;
+      if(!subBannerText){
+        subBannerHeight = 0;
+      }
+      if(!latlng){
+        subBannerHeight2 = 0;
+      }
+      const context = newCanvas.getContext("2d");
+      context.fillStyle = "#a00";
+      context.fillRect(0, 0, width, bannerHeight+subBannerHeight+subBannerHeight2);
+      
+      context.fillStyle = "#fff";
+      context.textAlign = "center";
+      context.font = `bold ${Math.round(bannerHeight * 0.8)}px serif`;
+      context.fillText(bannerText, width/2, Math.round(bannerHeight * 0.8), width);
+
+      if(subBannerText){
+        context.strokeStyle ="#fff";
+        const lineLength = Math.round(width * 0.3);
+        context.moveTo((width-lineLength)/2, bannerHeight);
+        context.lineTo((width-lineLength)/2+lineLength, bannerHeight);
+      //  context.stroke();
+        context.font = `${Math.round(subBannerHeight * 0.9)-3}px serif`;
+        context.fillText(subBannerText, width/2, bannerHeight + Math.round(subBannerHeight * 0.9)-3, width);
+      }
+      if(latlng){
+        context.font = `${Math.round(subBannerHeight2 * 0.9)-3}px serif`;
+        context.fillText(`（緯度:${latlng[0].toFixed(6)}, 経度:${latlng[1].toFixed(6)}）`, width/2, bannerHeight + subBannerHeight + Math.round(subBannerHeight2 * 0.9)-3, width);
+      }
+
+      context.drawImage(canvas, 0, bannerHeight+subBannerHeight+subBannerHeight2);
+
+      const contribution = "©Openstreetmap Contributors";
+      context.font = "12px sans-serif";
+      context.textAlign = "left";
+      const text_width = context.measureText(contribution).width;
+
+      context.fillStyle = "#fff";
+      context.fillRect(width-text_width-2,height-16,text_width+2,16);
+      context.fillStyle = "#333";
+      context.fillText(contribution, width-text_width-2, height-4);
+
+      return newCanvas;
+    }
+    return captureimage;
+  })()
 
   return {
     put_marker,
