@@ -463,7 +463,7 @@ const dart = (()=>{
       `;
 
     const popup = L.popup();
-    const container = L.DomUtil.create("div");
+    const container = L.DomUtil.create("div","popup-container-elm");
     const mainelm = L.DomUtil.create("div","popup-main", container);
     mainelm.innerHTML = `
       <strong>${placeName}</strong><br />
@@ -516,7 +516,7 @@ const dart = (()=>{
       <a href="${create_share_url(latlng, placeName)}" target="_blank">共有リンク</a>
       `;
       
-    const container = L.DomUtil.create("div");
+    const container = L.DomUtil.create("div","popup-container-elm");
     const mainelm = L.DomUtil.create("div","popup-main", container);
     mainelm.innerHTML = `
       <div class="arrival-message">
@@ -541,8 +541,11 @@ const dart = (()=>{
   }
 
   function checkin(latlng, zoom, placeName, popup, history){
-    console.log(popup);
-    if(true){
+    geolocation.get_once(false).then(loc=>{
+      const dist = utils.distance(loc, latlng);
+      if(dist < 0.5){ //500m未満
+        console.log("congratulations!");
+
         const popupElm = popup.getElement();
         popupElm.classList.add("dart-arrival")
         const old_content = popup.getContent();
@@ -552,11 +555,6 @@ const dart = (()=>{
         });
         const arrival_popup = create_arrival_popup_content({latlng, zoom, placeName, distance:0.375});
         popup.setContent(arrival_popup);
-    }
-    geolocation.get_once(false).then(loc=>{
-      const dist = utils.distance(loc, latlng);
-      if(dist < 0.5){
-        console.log("congratulations!");
       }
       else{
         alert(`まだ着いていないようです……\n（距離：${parseInt(dist*1000)}メートル）`);
@@ -898,7 +896,7 @@ const dart = (()=>{
           geo_marker.addTo(the_map);
           geo_marker.setLatLng([c.latitude,c.longitude]);
           if(moveto_location) the_map.panTo([c.latitude,c.longitude]);
-          console.log("get",lat,lng,c.accuracy);
+          //console.log("get",lat,lng,c.accuracy);
           resolve([c.latitude,c.longitude]);
         },err=>{
           reject(err);
@@ -933,49 +931,52 @@ const dart = (()=>{
 
   const captureimage = (()=>{
     async function captureimage(map, title_text = "日本列島をダーツで旅するやつ", place_text = "熊本県八代市郡築十一番町に、行ってらっしゃい", latlng){
-    const mapelm = map.getContainer();
+      const mapelm = map.getContainer();
 
-    const target_width = 540;
-    const target_height = 720;
+      const target_width = 540;
+      const target_height = 720;
 
-    const current_width = mapelm.clientWidth;
-    const current_height = mapelm.clientHeight;
-    const dx = Math.round((target_width - current_width)/2);
-    const dy = Math.round((target_height - current_height)/2);
+      const current_width = mapelm.clientWidth;
+      const current_height = mapelm.clientHeight;
+      const dx = Math.round((target_width - current_width)/2);
+      const dy = Math.round((target_height - current_height)/2);
 
-    let canvas = await domtoimage.toCanvas(mapelm, {
-      cacheBust: true,
-      width:target_width,
-      height:target_height,
-      //scale:1.5,
-      pixelRatio: window.devicePixelRatio || 1,
-      bgcolor: null,
-      preserveScroll: true,
-      loadExternalStyleSheet:true,
-      adjustClonedNode: (node,clone,after)=>{
-        if(node.classList && node.classList.contains("leaflet-map-pane")){
-          console.log("clone", clone);
-          clone.style.translate = `${dx}px ${dy}px`;
-        }
-      },
-      filter: (node) => {
-        if (node.classList && (
-            node.classList.contains('leaflet-control-container')
-          //  || node.classList.contains("dart-share_urls")
-          //  || node.classList.contains("popup-console")
-          )) {
-          return false;
-        }
-        else if(node.src){
-          if(/data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAACMAAAA/.exec(node.src)){
+      mapelm.querySelectorAll(".dart-share_urls, .popup-console").forEach(el=>{
+        el.style.display = "none";
+      })
+      let canvas = await domtoimage.toCanvas(mapelm, {
+        cacheBust: true,
+        width:target_width,
+        height:target_height,
+        pixelRatio: window.devicePixelRatio || 1,
+        bgcolor: null,
+        loadExternalStyleSheet:true,
+        adjustClonedNode: (node,clone,after)=>{
+          if(node.classList && node.classList.contains("leaflet-map-pane")){
+            clone.style.translate = `${dx}px ${dy}px`;
+          }
+        },
+        filter: (node) => {
+          if (node.classList && (
+              node.classList.contains('leaflet-control-container')
+              || node.classList.contains("dart-share_urls")
+              || node.classList.contains("popup-console")
+            )) {
             return false;
           }
-        }
-        return true;
+          else if(node.src){
+            if(/data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAACMAAAA/.exec(node.src)){
+              return false; //leaflet.centercross
+            }
+          }
+          return true;
         }
       })
-      canvas = cropAndResize(canvas, target_width, target_height-24-18);
-      canvas = appendBanner(canvas, target_width, target_height, title_text, 24, place_text, 18, latlng, 16);      
+      mapelm.querySelectorAll(".dart-share_urls, .popup-console").forEach(el=>{
+        el.style.display = "block";
+      })
+      canvas = cropAndResize(canvas, target_width, target_height-24-18-18);
+      canvas = appendBanner(canvas, target_width, target_height, title_text, 24, place_text, 20, latlng, 18);      
       canvas.toBlob((blob) => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
