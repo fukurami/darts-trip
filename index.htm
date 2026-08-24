@@ -175,13 +175,15 @@ body{
   text-align: center;
 }
 .leaflet-popup.dart-arrival .popup-main {
+  font-size:110%;
   color:#fff;
 }
 .leaflet-popup.dart-arrival .popup-main a{
   color:#ff0
 }
 .arrival-congrats {
-	font-size: 120%;
+	font-size: 150%;
+  font-style:italic;
 	color: #fffb00;
 }
 .dart-share_urls {
@@ -522,7 +524,7 @@ const dart = (()=>{
       <div class="arrival-message">
         <strong class="arrival-congrats">Congratulations!</strong><br /><br/>
         <strong>${placeName}</strong><br />に、到着しました!!!!<br />
-        <small>（距離：${parseInt((distance*1000))}メートル）</small>
+        （距離：${parseInt((distance*1000))}メートル）
       </div>
       <div class="dart-share_urls">
         ${urls}<br /><br />${shares}
@@ -532,7 +534,7 @@ const dart = (()=>{
     capture_link.href="javascript:void(0)";
     capture_link.innerText="シェア用画像をDL";
     capture_link.addEventListener("click", e=>{
-      captureimage(the_map, "日本列島をダーツで旅するやつ", `${placeName}に、到着しました！！！！`, latlng);
+      captureimage(the_map, "日本列島をダーツで旅するやつ", `${placeName}に、到着しました！！！！`, latlng, {backgroundColor:"#f00"});
     })
     mainelm.querySelector(".dart-share_urls").append(document.createElement("br"),capture_link);
 
@@ -543,7 +545,7 @@ const dart = (()=>{
   function checkin(latlng, zoom, placeName, popup, history){
     geolocation.get_once(false).then(loc=>{
       const dist = utils.distance(loc, latlng);
-      if(dist < 0.5){ //500m未満
+      if(dist < 0.3){ //300m未満
         console.log("congratulations!");
 
         const popupElm = popup.getElement();
@@ -553,7 +555,7 @@ const dart = (()=>{
           popupElm.classList.remove("dart-arrival");
           popup.setContent(old_content);
         });
-        const arrival_popup = create_arrival_popup_content({latlng, zoom, placeName, distance:0.375});
+        const arrival_popup = create_arrival_popup_content({latlng, zoom, placeName, distance:dist});
         popup.setContent(arrival_popup);
       }
       else{
@@ -930,7 +932,7 @@ const dart = (()=>{
   })();
 
   const captureimage = (()=>{
-    async function captureimage(map, title_text = "日本列島をダーツで旅するやつ", place_text = "熊本県八代市郡築十一番町に、行ってらっしゃい", latlng){
+    async function captureimage(map, title_text = "日本列島をダーツで旅するやつ", place_text = "熊本県八代市郡築十一番町に、行ってらっしゃい", latlng, style = {}){
       const mapelm = map.getContainer();
 
       const target_width = 540;
@@ -976,7 +978,7 @@ const dart = (()=>{
         el.style.display = "block";
       })
       canvas = cropAndResize(canvas, target_width, target_height-24-18-18);
-      canvas = appendBanner(canvas, target_width, target_height, title_text, 24, place_text, 20, latlng, 18);      
+      canvas = appendBanner(canvas, target_width, target_height, title_text, 24, place_text, 20, latlng, 18, style);      
       canvas.toBlob((blob) => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1020,7 +1022,10 @@ const dart = (()=>{
       return outCanvas;
     }
 
-    function appendBanner(canvas, width=720, height=960, bannerText="", bannerHeight=24, subBannerText="", subBannerHeight=16, latlng, subBannerHeight2=16){
+    function appendBanner(canvas, width=720, height=960, bannerText="", bannerHeight=24, subBannerText="", subBannerHeight=16, latlng, subBannerHeight2=16, style = {}){
+      const backgroundColor = style.backgroundColor || "#a00";
+      const textColor = style.textColor || "#fff";
+
       const newCanvas = document.createElement("canvas");
       newCanvas.width = width;
       newCanvas.height = height;
@@ -1031,16 +1036,16 @@ const dart = (()=>{
         subBannerHeight2 = 0;
       }
       const context = newCanvas.getContext("2d");
-      context.fillStyle = "#a00";
+      context.fillStyle = backgroundColor;
       context.fillRect(0, 0, width, bannerHeight+subBannerHeight+subBannerHeight2);
       
-      context.fillStyle = "#fff";
+      context.fillStyle = textColor;
       context.textAlign = "center";
       context.font = `bold ${Math.round(bannerHeight * 0.8)}px serif`;
       context.fillText(bannerText, width/2, Math.round(bannerHeight * 0.8), width);
 
       if(subBannerText){
-        context.strokeStyle ="#fff";
+        context.strokeStyle = textColor;
         const lineLength = Math.round(width * 0.3);
         context.moveTo((width-lineLength)/2, bannerHeight);
         context.lineTo((width-lineLength)/2+lineLength, bannerHeight);
